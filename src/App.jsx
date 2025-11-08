@@ -1,28 +1,69 @@
-import { useState } from 'react'
+import { useCallback, useMemo, useState } from 'react';
+import Header from './components/Header';
+import ChatMessages from './components/ChatMessages';
+import ChatInput from './components/ChatInput';
+import WellnessSidebar from './components/WellnessSidebar';
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [messages, setMessages] = useState([]);
+  const [error, setError] = useState('');
+
+  const backendUrl = useMemo(() => {
+    const base = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+    return base.replace(/\/$/, '');
+  }, []);
+
+  const sendMessage = useCallback(async (text) => {
+    setError('');
+    const userMsg = { role: 'user', content: text };
+    setMessages((prev) => [...prev, userMsg]);
+
+    try {
+      const res = await fetch(`${backendUrl}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, history: [] }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to get response');
+      }
+      const data = await res.json();
+      const assistantMsg = { role: 'assistant', content: data.reply };
+      setMessages((prev) => [...prev, assistantMsg]);
+    } catch (e) {
+      console.error(e);
+      setError('Could not reach the wellness coach. Please try again.');
+    }
+  }, [backendUrl]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 flex items-center justify-center">
-      <div className="bg-white p-8 rounded-lg shadow-lg">
-        <h1 className="text-3xl font-bold text-gray-800 mb-4">
-          Vibe Coding Platform
-        </h1>
-        <p className="text-gray-600 mb-6">
-          Your AI-powered development environment
-        </p>
-        <div className="text-center">
-          <button
-            onClick={() => setCount(count + 1)}
-            className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded"
-          >
-            Count is {count}
-          </button>
-        </div>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-teal-50 to-sky-50 text-neutral-900 dark:text-neutral-100">
+      <Header />
+
+      <main className="max-w-6xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-[1fr,20rem] gap-6">
+        <section className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white/80 dark:bg-neutral-900/70 backdrop-blur p-4 sm:p-6">
+          <div className="h-[62vh] sm:h-[68vh] overflow-y-auto pr-1 custom-scrollbar">
+            <ChatMessages messages={messages} />
+          </div>
+
+          {error && (
+            <div className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</div>
+          )}
+
+          <div className="mt-4">
+            <ChatInput onSend={sendMessage} />
+          </div>
+        </section>
+
+        <WellnessSidebar />
+      </main>
+
+      <footer className="py-6 text-center text-xs text-neutral-500">
+        This assistant provides general wellness information and is not a substitute for professional medical advice.
+      </footer>
     </div>
-  )
+  );
 }
 
-export default App
+export default App;
